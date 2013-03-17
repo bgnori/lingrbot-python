@@ -4,9 +4,6 @@
 """
     for sandboxing read:
         http://developer.plone.org/security/sandboxing.html
-
-    lingr.py is from:
-        https://github.com/tsukkee/lingr-vim/blob/master/autoload/lingr.py
 """
 
 from werkzeug import Request, ClosingIterator
@@ -16,12 +13,32 @@ from werkzeug import Response
 
 from werkzeug.routing import Map, Rule
 
+from AccessControl.ZopeGuards import get_safe_globals, safe_builtins
+from RestrictedPython import compile_restricted
 
-import lingr
+import json
 
 import sys
 
 DEBUG = True
+
+MAGIC = "#!py27"
+
+def sandbox(source):
+    """
+    based on:
+        http://developer.plone.org/security/sandboxing.html
+    """
+    g = get_safe_globals()
+    g['__builtins__'] = safe_builtins
+
+    from AccessControl.ImplPython import guarded_getattr as guarded_getattr_safe
+    g['_getattr_'] = guarded_getattr_safe
+
+    code = compile_restricted(source, "<string>", "eval")
+
+    return eval(code, g)
+
 
 url_map = Map([
     Rule("/py27", endpoint="py27"),
@@ -32,7 +49,44 @@ def index(request):
     return Response("Hello, world!", mimetype="text/plain")
 
 def py27(request):
-    return Response("Python2.7.3!", mimetype="text/plain")
+    """
+    {
+        "status":"ok",
+        "counter":13934721,
+        "events":[
+            {
+                "message":{
+                    "id":"14333031",
+                "room":"bgnori",
+                "public_session_id":"IrrMxt",
+                "icon_url":"http://www.gravatar.com/avatar/a00efd2efcb4f4efb65f01efd366f4b2.jpg",
+                "type":"user",
+                "speaker_id":"bgnori",
+                "nickname":"bgnori",
+                "text":".",
+                "timestamp":"2013-03-17T07:38:51Z",
+                "local_id":"pending-IrrMxt-4"},
+                "event_id":13934721
+            }
+        ]}
+    """
+    try:
+        data = json.loads(request.data)
+    except:
+        return Response('bad json', mimetype="text/plain")
+    for evt in data['events']:
+        msg = evt.get("message", None)
+        if msg and msg["text"].startswith(MAGIC):
+            source = msg["text"][len(MAGIC)+1:]
+            try:
+                r = sandbox(source)
+            except Exception, e:
+                return Response(str(e), mimetype="text/plain")
+            return Response(str(r), mimetype="text/plain")
+        else:
+            print >> sys.stderr, "nothing to send"
+            break
+    return Response('', mimetype="text/plain")
 
 views = {
         'index': index,
@@ -69,8 +123,8 @@ bot = Application()
 
 from werkzeug import DebuggedApplication
 
-debug = DebuggedApplication(bot)
-httpd = make_server('192.168.2.64', 10080, debug)
+#debug = DebuggedApplication(bot)
+httpd = make_server('192.168.2.64', 10080, bot)
 #httpd = make_server('lingrbot.tonic-water.com', 10080, debug)
 httpd.serve_forever()
 
