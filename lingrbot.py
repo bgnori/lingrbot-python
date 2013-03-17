@@ -1,12 +1,24 @@
 #!/usr/bin/env python
 #
 
+"""
+    for sandboxing read:
+        http://developer.plone.org/security/sandboxing.html
+
+    lingr.py is from:
+        https://github.com/tsukkee/lingr-vim/blob/master/autoload/lingr.py
+"""
+
 from werkzeug import Request, ClosingIterator
 from werkzeug.exceptions import HTTPException, InternalServerError
 
 from werkzeug import Response
 
 from werkzeug.routing import Map, Rule
+
+
+import lingr
+
 
 url_map = Map([
     Rule("/py2", endpoint="py2"),
@@ -54,9 +66,6 @@ from werkzeug import DebuggedApplication
 debug = DebuggedApplication(bot)
 httpd = make_server('192.168.2.64', 10080, debug)
 #httpd = make_server('lingrbot.tonic-water.com', 10080, debug)
-#httpd = make_server('', 10080, debug)
-#httpd = make_server('localhost', 10080, debug)
-#httpd = make_server('219.121.0.102', 10080, debug) wrong!
 httpd.serve_forever()
 
 
