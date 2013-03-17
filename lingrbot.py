@@ -19,21 +19,24 @@ from werkzeug.routing import Map, Rule
 
 import lingr
 
+import sys
+
+DEBUG = True
 
 url_map = Map([
-    Rule("/py2", endpoint="py2"),
+    Rule("/py27", endpoint="py27"),
     Rule("/", endpoint="index"),
 ])
 
 def index(request):
     return Response("Hello, world!", mimetype="text/plain")
 
-def py2(request):
+def py27(request):
     return Response("Python2.7.3!", mimetype="text/plain")
 
 views = {
         'index': index,
-        'py2': py2,
+        'py27': py27,
         }
 
 class Application(object):
@@ -41,6 +44,9 @@ class Application(object):
         try:
             self._setup()
             request = Request(environ)
+            if(DEBUG):
+                print >> sys.stderr, request.base_url 
+                print >> sys.stderr, request.data
             adapter = url_map.bind_to_environ(environ)
             endpoint, values = adapter.match()
             handler = views.get(endpoint)
