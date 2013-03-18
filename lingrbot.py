@@ -24,7 +24,8 @@ DEBUG = True
 
 MAGIC = "#!py27"
 
-def sandbox(source):
+
+def build_global(data):
     """
     based on:
         http://developer.plone.org/security/sandboxing.html
@@ -34,10 +35,8 @@ def sandbox(source):
 
     from AccessControl.ImplPython import guarded_getattr as guarded_getattr_safe
     g['_getattr_'] = guarded_getattr_safe
-
-    code = compile_restricted(source, "<string>", "eval")
-
-    return eval(code, g)
+    g['data'] = data
+    return g
 
 
 url_map = Map([
@@ -53,6 +52,9 @@ def py27(request):
     {
         "status":"ok",
         "counter":13934721,
+        "data":[
+            "something for data"
+        ],
         "events":[
             {
                 "message":{
@@ -74,12 +76,20 @@ def py27(request):
         data = json.loads(request.data)
     except:
         return Response('bad json', mimetype="text/plain")
+  
+    
+    userdata = None
+    for evt in data['events']:
+        userdata = evt.get("data", None)
+    g = build_global(userdata)
+    #print >> sys.stderr, g
+
     for evt in data['events']:
         msg = evt.get("message", None)
         if msg and msg["text"].startswith(MAGIC):
             source = msg["text"][len(MAGIC)+1:]
             try:
-                r = sandbox(source)
+                r = eval(compile_restricted(source, "<string>", "eval"), g)
             except Exception, e:
                 return Response(str(e), mimetype="text/plain")
             return Response(str(r), mimetype="text/plain")
